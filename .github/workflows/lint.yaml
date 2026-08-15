@@ -1,0 +1,157 @@
+name: Lint Code
+
+on:
+  workflow_call:
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.detect.outputs.python }}
+      rust: ${{ steps.detect.outputs.rust }}
+      golang: ${{ steps.detect.outputs.golang }}
+      bash: ${{ steps.detect.outputs.bash }}
+      fish: ${{ steps.detect.outputs.fish }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: detect
+        run: |
+          have() { [ -n "$(git ls-files -- "$@" | head -1)" ]; }
+
+          if   have pyproject.toml; then python=project
+          elif have '*.py';         then python=scripts
+          else                           python=; fi
+
+          if   have Cargo.toml;     then rust=project
+          elif have '*.rs';         then rust=scripts
+          else                           rust=; fi
+
+          if   have go.mod;         then golang=module
+          else                           golang=; fi
+
+          if   have '*.sh';         then bash=scripts
+          else                           bash=; fi
+
+          if   have '*.fish';       then fish=scripts
+          else                           fish=; fi
+
+          {
+            echo "python=$python"
+            echo "rust=$rust"
+            echo "golang=$golang"
+            echo "bash=$bash"
+            echo "fish=$fish"
+          } >> "$GITHUB_OUTPUT"
+
+  lint-python-project:
+    needs: detect
+    if: needs.detect.outputs.python == 'project'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR="/usr/local/bin" sh
+          uv sync --all-extras
+      - name: Check pyproject.toml formatting
+        run: uv run pyproject-fmt --check pyproject.toml
+      - name: Check code formatting
+        run: uv run ruff format --check ./
+      - name: Lint with ruff
+        run: uv run ruff check
+      - name: Lint with Ty
+        run: uv run ty check
+      - name: Analyze Dependencies
+        run: uv run deptry .
+
+  lint-python-scripts:
+    needs: detect
+    if: needs.detect.outputs.python == 'scripts'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR="/usr/local/bin" sh
+      - name: Check code formatting
+        run: uvx ruff format --check .
+      - name: Lint with ruff
+        run: uvx ruff check --extend-select I,RUF022 .
+      - name: Lint with Ty
+        run: |
+          status=0
+          for f in $(git ls-files -- '*.py'); do
+            echo "::group::ty $f"
+            uv sync --script "$f" \
+              && uvx ty check --python "$(uv python find --script "$f")" "$f" \
+              || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
+  lint-rust-project:
+    needs: detect
+    if: needs.detect.outputs.rust == 'project'
+    runs-on: ubuntu-latest
+    container:
+      image: dclong/rust-cicd
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check Code Formatting
+        run: |
+          cargo fmt --all -- --check
+
+  lint-rust-scripts:
+    needs: detect
+    if: needs.detect.outputs.rust == 'scripts'
+    runs-on: ubuntu-latest
+    container:
+      image: dclong/rust-cicd
+    steps:
+      - uses: actions/checkout@v6
+      - name: Allow git in container workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Check Code Formatting
+        run: git ls-files -- '*.rs' | xargs -r rustfmt --check --edition 2024
+
+  lint-bash-scripts:
+    needs: detect
+    if: needs.detect.outputs.bash == 'scripts'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install shfmt
+        run: sudo apt update && sudo apt install -y shfmt
+      - name: Check Shell Formatting
+        run: git ls-files -- '*.sh' | xargs -r shfmt -i 4 -ci -d
+      - name: Lint Shell Script
+        run: git ls-files -- '*.sh' | xargs -r shellcheck
+
+  lint-fish-scripts:
+    needs: detect
+    if: needs.detect.outputs.fish == 'scripts'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install icon
+        run: curl -sSL https://raw.githubusercontent.com/legendu-net/icon/main/install_icon.sh | sudo bash -
+      - name: Install the Fish Shell
+        run: icon fish -i
+      - name: Check Code Formatting
+        shell: fish {0}
+        run: git ls-files -- '*.fish' | xargs -r fish_indent -c
+      - name: Lint Code
+        shell: fish {0}
+        run: git ls-files -- '*.fish' | xargs -r fish -n
+
+  lint-golang:
+    needs: detect
+    if: needs.detect.outputs.golang == 'module'
+    runs-on: ubuntu-latest
+    container:
+      image: golangci/golangci-lint:v2.6.2-alpine
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check Code Formatting
+        run: golangci-lint fmt -d
+      - name: Lint Code
+        run: GOFLAGS=-buildvcs=false golangci-lint run
