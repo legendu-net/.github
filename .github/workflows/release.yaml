@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  workflow_call:
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.detect.outputs.python }}
+      golang: ${{ steps.detect.outputs.golang }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: detect
+        run: |
+          have() { [ -n "$(git ls-files -- "$@" | head -1)" ]; }
+
+          if have pyproject.toml; then python=true; else python=; fi
+          if have go.mod;         then golang=true; else golang=; fi
+
+          {
+            echo "python=$python"
+            echo "golang=$golang"
+          } >> "$GITHUB_OUTPUT"
+
+  release-python-library:
+    needs: detect
+    if: needs.detect.outputs.python == 'true'
+    name: Release Python Project
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR="/usr/local/bin" sh
+      - name: Build and Publish Package to PyPI
+        run: |
+          uv build
+          ls -lha dist/
+          uv publish -u __token__ -p ${{ secrets.PYPI_TOKEN }}
+
+  release-golang-library:
+    needs: detect
+    if: needs.detect.outputs.golang == 'true'
+    name: Release Golang Project
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, darwin]
+        goarch: [amd64, arm64]
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    steps:
+    - uses: actions/checkout@v6
+    - uses: wangyoucao577/go-release-action@v1
+      with:
+        github_token: ${{ secrets.ACTIONS_TOKEN }}
+        goos: ${{ matrix.goos }}
+        goarch: ${{ matrix.goarch }}
+        #compress_assets: false

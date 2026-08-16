@@ -1,0 +1,131 @@
+name: Run Tests
+
+on:
+  workflow_call:
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.detect.outputs.python }}
+      rust: ${{ steps.detect.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: detect
+        run: |
+          have() { [ -n "$(git ls-files -- "$@" | head -1)" ]; }
+
+          if   have pyproject.toml; then python=project
+          elif have '*.py';         then python=scripts
+          else                           python=; fi
+
+          if   have Cargo.toml;     then rust=project
+          elif have '*.rs';         then rust=scripts
+          else                           rust=; fi
+
+          {
+            echo "python=$python"
+            echo "rust=$rust"
+          } >> "$GITHUB_OUTPUT"
+
+  test-python:
+    needs: detect
+    if: needs.detect.outputs.python == 'project'
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os:
+          - macOS-latest
+          - ubuntu-latest
+        # The oldest supported patch release, spelled out rather than "3.12":
+        # a bare "3.12" resolves to the runner's system interpreter, which is
+        # below `requires-python` on ubuntu-latest, and uv then fails outright
+        # instead of looking for a compatible interpreter to download.
+        python-version:
+          - "3.12.7"
+          - "3.13"
+          - "3.14"
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install dependencies
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR="/usr/local/bin" sh
+        uv sync --all-extras
+    - name: Test with pytest
+      run: uv run --python ${{ matrix.python-version }} pytest
+      env:
+        GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
+
+  test-python-scripts:
+    needs: detect
+    if: needs.detect.outputs.python == 'scripts'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR="/usr/local/bin" sh
+      - name: Test with pytest
+        run: |
+          status=0
+          for f in $(git ls-files -- '*.py'); do
+            grep -q '^# /// script' "$f" || continue
+            echo "::group::pytest $f"
+            uv sync --script "$f" \
+              && python="$(uv python find --script "$f")" \
+              && uv pip install --python "$python" pytest \
+              && { "$python" -m pytest --doctest-modules "$f"; rc=$?; [ "$rc" = 0 ] || [ "$rc" = 5 ]; } \
+              || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
+
+  test-rust:
+    needs: detect
+    if: needs.detect.outputs.rust == 'project'
+    permissions:
+      pull-requests: read
+      contents: read
+    runs-on: ${{matrix.os}}
+    #runs-on: self-hosted
+    container:
+      image: dclong/rust-cicd
+      env:
+        RUSTFLAGS: -Awarnings
+        RUSTC_WRAPPER: ""
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          #- macOS-latest
+    steps:
+      - uses: actions/checkout@v6
+      #- uses: Swatinem/rust-cache@v2
+      - name: Run Test Cases
+        run: |
+          cargo test --locked
+
+  test-rust-scripts:
+    needs: detect
+    if: needs.detect.outputs.rust == 'scripts'
+    runs-on: ubuntu-latest
+    container:
+      image: dclong/rust-cicd
+      env:
+        RUSTFLAGS: -Awarnings
+        RUSTC_WRAPPER: ""
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run Test Cases
+        run: |
+          status=0
+          for f in $(git ls-files -- '*.rs'); do
+            echo "::group::rustc --test $f"
+            bin="/tmp/$(basename "$f" .rs)_test"
+            rustc --edition 2024 --test "$f" -o "$bin" \
+              && "$bin" \
+              || status=1
+            echo "::endgroup::"
+          done
+          exit $status
