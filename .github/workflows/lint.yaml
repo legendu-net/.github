@@ -49,10 +49,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
       - name: Install dependencies
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR="/usr/local/bin" sh
-          uv sync --all-extras
+        run: uv sync --all-extras
       - name: Check pyproject.toml formatting
         run: uv run pyproject-fmt --check pyproject.toml
       - name: Check code formatting
@@ -71,7 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR="/usr/local/bin" sh
+        uses: astral-sh/setup-uv@v10.0.1
       - name: Check code formatting
         run: uvx ruff format --check .
       - name: Lint with ruff
