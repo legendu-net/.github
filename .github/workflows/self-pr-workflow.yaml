@@ -1,4 +1,4 @@
-name: PR Workflow
+name: Self PR Workflow
 
 on:
   pull_request:
