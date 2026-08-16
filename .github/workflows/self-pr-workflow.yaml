@@ -1,0 +1,33 @@
+name: PR Workflow
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+    branches:
+      - main
+
+jobs:
+  lint_code:
+    uses: ./.github/workflows/lint.yaml
+    secrets: inherit
+
+  test_code:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/test.yaml
+    secrets: inherit
+
+  claude-review:
+    needs: [lint_code, test_code]
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      id-token: write
+    uses: ./.github/workflows/claude-code-review.yaml
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+      draft: ${{ github.event.pull_request.draft }}
+      head_repo_full_name: ${{ github.event.pull_request.head.repo.full_name }}
+    secrets: inherit
