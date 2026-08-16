@@ -5,7 +5,7 @@ on:
       pattern:
         required: false
         type: string
-        default: '^(?!main$)'
+        default: '^(?!(main|dev)$)'
 jobs:
   remove_branch:
     runs-on: ubuntu-latest
