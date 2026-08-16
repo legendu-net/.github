@@ -1,4 +1,4 @@
-name: Create PR To main
+name: Self Create PR To main
 
 on:
   push:

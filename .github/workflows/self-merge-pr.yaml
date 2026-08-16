@@ -1,4 +1,4 @@
-name: Auto Merge PR
+name: Self Merge PR
 on:
   # The Claude review runs with `track_progress`, which creates its tracking
   # comment when the review *starts* and then edits that same comment as the
@@ -8,13 +8,13 @@ on:
   # workflow to complete is what reliably lands after the marker exists and
   # after the head-commit age gate has been cleared.
   #
-  # In this repo, lint/test/review each run as a job inside "PR Workflow"
+  # In this repo, lint/test/review each run as a job inside "Self PR Workflow"
   # (self-pr-workflow.yaml) rather than as independently triggered workflows,
-  # so only "PR Workflow" itself ever produces a top-level run for
+  # so only "Self PR Workflow" itself ever produces a top-level run for
   # `workflow_run` to match on. Renaming it silently disables the trigger.
   workflow_run:
     workflows:
-      - PR Workflow
+      - Self PR Workflow
     types:
       - completed
   # Kept for approvals that come from a human rather than from Claude.
