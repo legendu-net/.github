@@ -8,5 +8,5 @@ on:
 
 jobs:
   create_pr_main:
-    uses: ./.github/workflows/create_pr_to_main.yaml
+    uses: ./.github/workflows/create-pr-to-main.yaml
     secrets: inherit

@@ -25,7 +25,7 @@ jobs:
       issues: write
       pull-requests: write
       id-token: write
-    uses: ./.github/workflows/claude-code-review.yml
+    uses: ./.github/workflows/claude-code-review.yaml
     with:
       pr_number: ${{ github.event.pull_request.number }}
       draft: ${{ github.event.pull_request.draft }}
