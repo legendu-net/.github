@@ -85,6 +85,7 @@ jobs:
         run: |
           status=0
           for f in $(git ls-files -- '*.py'); do
+            grep -q '^# /// script' "$f" || continue
             echo "::group::ty $f"
             uv sync --script "$f" \
               && uvx ty check --python "$(uv python find --script "$f")" "$f" \
