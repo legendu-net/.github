@@ -123,10 +123,31 @@ jobs:
     needs: detect
     if: needs.detect.outputs.bash == 'scripts'
     runs-on: ubuntu-latest
+    env:
+      # Installed from pinned GitHub releases rather than `apt install`:
+      # apt on the GitHub-hosted Ubuntu runners has repeatedly hung on this
+      # job (needrestart's interactive prompt stalling a supposedly
+      # noninteractive install). Bump these deliberately, and when shfmt is
+      # bumped run `shfmt -i 4 -ci -w .` locally in the same commit so the
+      # tree matches whatever the new version considers formatted.
+      SHFMT_VERSION: '3.13.1'
+      SHELLCHECK_VERSION: '0.11.0'
     steps:
       - uses: actions/checkout@v6
-      - name: Install shfmt
-        run: sudo apt update && sudo apt install -y shfmt
+      - name: Install shfmt and shellcheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          cd "$tmp"
+          curl -sSLf -o shfmt \
+              "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64"
+          curl -sSLf -o shellcheck.tar.xz \
+              "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          tar xf shellcheck.tar.xz
+          sudo install -m 755 shfmt "shellcheck-v${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/
+          shfmt --version
+          shellcheck --version
       - name: Check Shell Formatting
         run: git ls-files -- '*.sh' | xargs -r shfmt -i 4 -ci -d
       - name: Lint Shell Script
