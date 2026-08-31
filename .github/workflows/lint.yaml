@@ -13,6 +13,7 @@ jobs:
       bash: ${{ steps.detect.outputs.bash }}
       fish: ${{ steps.detect.outputs.fish }}
       lua: ${{ steps.detect.outputs.lua }}
+      markdown: ${{ steps.detect.outputs.markdown }}
     steps:
       - uses: actions/checkout@v6
       - id: detect
@@ -39,6 +40,9 @@ jobs:
           if   have '*.lua';        then lua=scripts
           else                           lua=; fi
 
+          if   have '*.md';         then markdown=files
+          else                           markdown=; fi
+
           {
             echo "python=$python"
             echo "rust=$rust"
@@ -46,6 +50,7 @@ jobs:
             echo "bash=$bash"
             echo "fish=$fish"
             echo "lua=$lua"
+            echo "markdown=$markdown"
           } >> "$GITHUB_OUTPUT"
 
   lint-python-project:
@@ -236,3 +241,22 @@ jobs:
         run: |
           set -euo pipefail
           selene .
+
+  lint-markdown:
+    needs: detect
+    if: needs.detect.outputs.markdown == 'files'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+      - name: Check Markdown formatting
+        run: uvx --with mdformat-gfm mdformat --check .
+      - name: Spell check
+        run: uvx codespell --skip="./.git,./.jj,./.devcontainer,./notebooks,*.ipynb"
+      - name: Check links
+        uses: lycheeverse/lychee-action@v2
+        continue-on-error: true
+        with:
+          args: --no-progress './**/*.md'
+          fail: false
