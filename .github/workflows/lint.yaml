@@ -253,7 +253,7 @@ jobs:
       - name: Check Markdown formatting
         run: uvx --with mdformat-gfm mdformat --check .
       - name: Spell check
-        run: uvx codespell --skip="./.git,./.jj,./.devcontainer,./notebooks,*.ipynb"
+        run: git ls-files -z '*.md' | xargs -0 -r uvx codespell
       - name: Check links
         uses: lycheeverse/lychee-action@v2
         continue-on-error: true
