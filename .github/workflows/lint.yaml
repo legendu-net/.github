@@ -251,7 +251,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v10.0.1
       - name: Check Markdown formatting
-        run: uvx --with mdformat-gfm mdformat --check .
+        run: uvx --with mdformat-gfm --with mdformat-frontmatter mdformat --check .
       - name: Spell check
         run: git ls-files -z '*.md' | xargs -0 -r uvx codespell
       - name: Check links
