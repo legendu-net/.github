@@ -50,7 +50,10 @@ jobs:
     - name: Install uv
       uses: astral-sh/setup-uv@v10.0.1
     - name: Install dependencies
-      run: uv sync --all-extras
+      # Pin the matrix Python here too: without `--python`, uv syncs with an
+      # interpreter of its own choosing (e.g. downloading the newest one
+      # `requires-python` allows), not the one being tested.
+      run: uv sync --all-extras --python ${{ matrix.python-version }}
     - name: Test with pytest
       run: uv run --python ${{ matrix.python-version }} pytest
       env:
